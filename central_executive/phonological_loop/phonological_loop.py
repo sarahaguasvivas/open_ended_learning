@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class Phonological_Loop(ABC):
+class PhonologicalLoop(ABC):
 
     def __init__(self):
         pass
