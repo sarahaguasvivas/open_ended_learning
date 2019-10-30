@@ -57,9 +57,23 @@ def test(args, model, device, test_loader):
             # restrict data. TODO: do this in DataLoader
             data = data[target < MAX_TEST_CLASSES]
             target = target[target < MAX_TEST_CLASSES]
+            first_layers = list(model.children())[:-1]
+            last_layer = list(model.children())[-1]
+
+            #new_last_layer = nn.Linear(500, MAX_TEST_CLASSES)
+            #for idx, w in enumerate(last_layer.weight):
+            #    new_last_layer.weight[idx] = nn.Parameter(w)
+            # new_last_layer.weight[-1] = nn.Parameter()
+            # model._modules['fc2'] = new_last_layer
+
 
             data, target = data.to(device), target.to(device)
             output = model(data)
+            import heapq
+            two_largest = heapq.nlargest(2, output[0])
+            ratio = two_largest[0] / two_largest[1]
+            ipdb.set_trace()
+
             test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
