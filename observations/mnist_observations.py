@@ -3,7 +3,7 @@ from keras.datasets import mnist
 
 class MNISTObservations(Observations):
     def __init__(self):
-        self.observations =
+        self.observations = None
         pass
 
 
