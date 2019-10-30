@@ -6,6 +6,10 @@ class MNISTObservations(Observations):
         self.observations = None
         pass
 
-
     def observe(self):
+        """
+            Here 'observe' means to
+            randomly sample a new
+            data point in MNIST
+        """
         pass
