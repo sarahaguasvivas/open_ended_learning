@@ -46,39 +46,43 @@ class Net(nn.Module):
 
     def addCategory(self, output, output_ratios, threshold):
         model = self
-        for idx, ratio in enumerate(output_ratios):
-            if ratio > threshold:
-                first_bad_output = output[idx]
-                output_probs = torch.exp(first_bad_output)
-                first_layers = list(model.children())[:-1]
-                last_layer = list(model.children())[-1]
-                old_state_dict = last_layer.state_dict()
-                old_weight = old_state_dict['weight']
-                old_bias = old_state_dict['bias']
-                new_bias_layer = torch.Tensor(1)
-                new_weight_layer = torch.Tensor(1, old_weight.shape[1])
-                for idx, prob in enumerate(output_probs):
-                    new_weight_layer += prob * old_weight[idx]
-                    new_bias_layer += prob * old_bias[idx]
-                new_bias = torch.cat([old_bias, new_bias_layer], dim=0)
-                new_weight = torch.cat([old_weight, new_weight_layer], dim=0)
-                new_state_dict = OrderedDict({
-                    'weight': new_weight,
-                    'bias': new_bias
-                })
-                new_last_layer = nn.Linear(500, last_layer.out_features + 1)
-                new_last_layer.load_state_dict(new_state_dict)
-                model._modules['fc2'] = new_last_layer
-                return
+        max_ratio_idx = np.argmax(output_ratios)
+        most_uncertain_output = output[max_ratio_idx]
+        output_probs = torch.exp(most_uncertain_output)
+        first_layers = list(model.children())[:-1]
+        last_layer = list(model.children())[-1]
+        old_state_dict = last_layer.state_dict()
+        old_weight = old_state_dict['weight']
+        old_bias = old_state_dict['bias']
+        new_bias_layer = torch.zeros(1)
+        new_weight_layer = torch.zeros(1, old_weight.shape[1])
+        for idx, prob in enumerate(output_probs):
+            new_weight_layer += prob * old_weight[idx]
+            new_bias_layer += prob * old_bias[idx]
+        new_bias = torch.cat([old_bias, new_bias_layer], dim=0)
+        new_weight = torch.cat([old_weight, new_weight_layer], dim=0)
+        new_state_dict = OrderedDict({
+            'weight': new_weight,
+            'bias': new_bias
+        })
+        new_last_layer = nn.Linear(500, last_layer.out_features + 1)
+        new_last_layer.load_state_dict(new_state_dict)
+        model._modules['fc2'] = new_last_layer
 
     def addNewCategories(self, data, threshold):
-        model = self
-        output = model(data)
-        output_ratios = self.getOutputRatios(output)
-        while any(output_ratios > threshold):
-            model.addCategory(output, output_ratios, threshold)
+        with torch.no_grad():
+            model = self
             output = model(data)
             output_ratios = self.getOutputRatios(output)
+            # ipdb.set_trace()
+            while any(output_ratios > threshold):
+                print(np.where(output_ratios > threshold))
+                # TODO: adding a new category creates more above threshold output ratios,
+                # leading to lots of new categories here. Need to avoid this somehow
+                ipdb.set_trace()
+                model.addCategory(output, output_ratios, threshold)
+                output = model(data)
+                output_ratios = self.getOutputRatios(output)
         return output
 
 
@@ -114,11 +118,11 @@ def test(args, model, device, test_loader):
             data, target = data.to(device), target.to(device)
 
             output = model(data)
-            threshold = 0.1
+            threshold = 0.5
             output_ratios = model.getOutputRatios(output)
+
             if any(output_ratios > threshold):
                 output = model.addNewCategories(data, threshold)
-            ipdb.set_trace()
 
             test_loss += F.nll_loss(
                 output, target, reduction='sum').item()  # sum up batch loss
