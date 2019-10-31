@@ -105,24 +105,29 @@ def train(args, model, device, train_loader, optimizer, epoch):
                 100. * batch_idx / len(train_loader), loss.item()))
 
 
-def test(args, model, device, test_loader):
+def test(args, model, device, test_loader, with_new_data=False):
     model.eval()
     test_loss = 0
     correct = 0
     with torch.no_grad():
         for data, target in test_loader:
             # restrict data. TODO: do this in DataLoader
-            data = data[target < MAX_TEST_CLASSES]
-            target = target[target < MAX_TEST_CLASSES]
+            if with_new_data:
+                data = data[target < MAX_TEST_CLASSES]
+                target = target[target < MAX_TEST_CLASSES]
+            else:
+                data = data[target < MAX_TRAIN_CLASSES]
+                target = target[target < MAX_TRAIN_CLASSES]
 
             data, target = data.to(device), target.to(device)
 
             output = model(data)
-            threshold = 0.5
-            output_ratios = model.getOutputRatios(output)
 
-            if any(output_ratios > threshold):
-                output = model.addNewCategories(data, threshold)
+            if with_new_data:
+                threshold = 0.5
+                output_ratios = model.getOutputRatios(output)
+                if any(output_ratios > threshold):
+                    output = model.addNewCategories(data, threshold)
 
             test_loss += F.nll_loss(
                 output, target, reduction='sum').item()  # sum up batch loss
@@ -231,6 +236,8 @@ def main():
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
         test(args, model, device, test_loader)
+
+    test(args, model, device, test_loader, with_new_data=True)
 
     if (args.save_model):
         torch.save(model.state_dict(), "mnist_cnn.pt")
